@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>官岭村与竹囮村知识图谱</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+            height: calc(100vh - 40px);
+        }
+        
+        .chart-container {
+            flex: 2;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        #chart {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sidebar {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-content {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .sub-nodes {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .sub-node-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .sub-node-item:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(5px);
+        }
+        
+        .sub-node-item.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 18px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .legend {
+            font-size: 12px;
+            color: #666;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 5px;
+        }
+        
+        .legend-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        .details {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .detail-text {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.8;
+            text-align: justify;
+        }
+
+        .close-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chart-container">
+            <div id="chart"></div>
+        </div>
+        <div class="sidebar">
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #667eea;"></span>
+                    <span>一级节点</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #764ba2;"></span>
+                    <span>二级节点</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #f97316;"></span>
+                    <span>三级节点</span>
+                </div>
+            </div>
+            <div id="info-panel">
+                <div class="empty-state">
+                    <div style="font-size: 40px; margin-bottom: 10px;">👆</div>
+                    <p>点击图谱中的节点查看详情</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const knowledgeData = {
+            "官岭村": {
+                description: "坐落于松阳县新兴镇，海拔 620 米，属浙西南典型高山阶梯式古村。2014 年列入第三批中国传统村落。",
+                subNodes: {
+                    "村落概况与宗族源流": {
+                        description: "官岭村的地理位置、建村历史、姓氏结构、陈氏迁居源流及多姓兴替的历史故事。",
+                        details: "官岭村始建于元末明初，距今六百余年；明万历年间形成规模，古官道穿村而过。陈姓占全村 95%以上，先祖原籍福建武夷山。'官岭'村名因历代陈氏有人出仕得名。",
+                        children: {
+                            "地理位置与建制": "海拔 620 米，属浙西南典型高山阶梯式古村。2024 年与下方竹囮村完成合并。",
+                            "建村历史": "始建于元末明初，距今六百余年；明万历年间形成规模。村落选址于山坡坡地，民居以黄土夯筑。",
+                            "姓氏结构": "陈姓占全村 95%以上，另有金、徐、周等少量住户。",
+                            "陈氏迁居源流": "先祖原籍福建武夷山，远祖为南宋太尉陈侯。始迁祖陈胜祖从玉岩下陈迁入官岭开基。",
+                            "多姓兴替典故": "陈、杨、叶三族各建祠堂，后因吉时差异导致杨、叶两族渐衰，陈氏独旺。"
+                        }
+                    },
+                    "陈氏宗祠建筑": {
+                        description: "明代万历年间始建，距今约五至六百年，是松阳仅存 6 座保留完整明代形制的宗祠之一。",
+                        details: "坐落村口水口处，四合院形制、八字青砖门墙。主梁用红豆杉，该树种现已列入保护禁止采伐。大门悬挂'陈氏宗祠'牌匾，享堂主梁题写'太丘遗范'。",
+                        children: {
+                            "始建年代与形制": "始建于明代万历年间，四合院形制、八字青砖门墙，是松阳仅存 6 座保留完整明代形制的宗祠之一。",
+                            "建筑标识": "大门悬挂'陈氏宗祠'牌匾；享堂主梁题写'太丘遗范'；照壁镌刻陈氏'十勉十戒'族规。正中为共同始祖陈红秀（太公画像），两侧为分支先祖画像。",
+                            "历史记载": "官岭村陈氏远祖为曾任御史中丞、葬于丽水碧湖乌石冈石牛的括苍陈永，其次子是松阳龙湾陈氏始祖，该支传十代迁至下川（今下陈），再历十代后，陈胜祖公于明万历年间迁居官岭筑屋定居，村内陈氏宗祠右墙留存 1580 年碑刻，完整记载陈氏迁入松阳始末，民间相传下陈陈氏耕牛行至官岭驻足不肯离去，成为陈氏择居此地的口述渊源；官岭早有原住民，据村庄石碑记载最早居民为卯峰叶氏第三十八世叶衢，其自古市塘岸迁来，叶氏族人在村中官道沿线生活百余年，叶衢六世孙远二公后自官岭迁往岱头村，明代另有杨氏族人迁入，彼时杨氏聚居地为如今村大会堂旧址，叶氏居于村内腹地，杨、陈两族同期修建祠堂，风水师选定同一上梁时辰并预言当夜有大雨，陈氏提前备好雨具按时完成上梁，杨氏因防雨物资不足错失吉时，后世杨氏人丁断绝、叶氏后裔外迁，仅陈氏一脉留存，当地流传 “羊 (杨) 吃叶，留根筋 (陈)” 的方言俗语。",
+                            "修缮历程": "1997 年大规模重修；2017 年修缮木梁；2014 年列入传统村落后再行抢险修缮。",
+                            "遗存实物": "留存古碑、清代成套祭祀法器、祭祀兵器、八仙礼器，为县级民俗实物遗存。"
+                        }
+                    },
+                    "陈氏宗族礼制与祭祀": {
+                        description: "包括族规家训、祭祀会首制度、年度祭祀流程和日常宗族功能。",
+                        details: "全村每年遴选 32 名成年男丁组成祭祀会首，分工主持全年祭祖与神庙祭拜。核心家训为'读书志在圣贤、相士道先器识''廉以养德，耻以起懦'。",
+                        children: {
+                            "族规家训": "核心家训'读书志在圣贤、相士道先器识''廉以养德，耻以起懦'。明代先祖订立'十勉十戒'韵诗体族规。",
+                            "祭祀会首制度": "全村每年遴选 32 名成年男丁组成祭祀会首，分工主持全年祭祖与神庙祭拜。",
+                            "年度祭祀流程": "除夕至正月初四每日 6 人值守；正月初八集中祭祖；正月十三至十五元宵节联合大祭。",
+                            "日常宗族功能": "宗祠为婚丧议事、族内调解、节庆集会、文化展览场地。村民家中设'香火堂'供奉三代近祖。"
+                        }
+                    },
+                    "庙宇信仰体系": {
+                        description: "官岭形成完整信仰建筑群，包括永庆堂、关公庙、四相公庙、禹王庙等。",
+                        details: "官岭形成完整信仰建筑群，全部纳入传统村落保护。2014 年后启动修缮；2015 至 2018 年进行'微改造、精提升'。",
+                        children: {
+                            "现存祠庙清单": "永庆堂（村口廊桥神殿）、关公庙（村口）、四相公庙（村中）、禹王庙（村尾溪流处）。",
+                            "庙宇修缮": "2014 年后启动修缮；2015 至 2018 年'微改造、精提升'，维护资金采用'村集体出资+文旅补助+族人自筹'三方模式。",
+                            "庙宇开光仪式": "聘道士主持，神像双眼以红布遮蔽，道士'点眼'并重塑衣饰。核心环节为'恭请龙神、前往池塘取龙水'。"
+                        }
+                    },
+                    "全年核心民俗活动": {
+                        description: "包括正月桃龙舞、春节至元宵联合大祭、地方性农耕祭祀和戏曲活动。",
+                        details: "正月桃龙舞是明代传承的非遗项目，11 节竹扎龙身。春节至元宵期间举办联合大祭。",
+                        children: {
+                            "正月桃龙舞": "11 节竹扎龙身（中间九节+龙头龙尾），本地称'桃龙'，寓避灾祈福。正月初八至十五进行。",
+                            "春节至元宵联合大祭": "32 名会首统一采办十七样祭品，按序逐庙祭拜。",
+                            "地方性农耕祭祀": "春季开茶祭祀土地，秋季香榧采收前祭拜禹王。",
+                            "戏曲活动": "冬季农闲时聘请专业剧团在村内文化礼堂演出。"
+                        }
+                    },
+                    "竹资源利用与手工竹编": {
+                        description: "竹子为生产生活核心原料，传统用于编器物、制簿册、织晒谷筐等。",
+                        details: "传统竹子为生产生活核心原料；现在手工竹编需求大幅下降，毛竹仍用于制作风筝、龙灯骨架。",
+                        children: {
+                            "毛竹资源与用途变迁": "传统：竹子为生产生活核心原料。现在：手工竹编需求大幅下降，村民多采伐毛竹外销。",
+                            "民居与基础设施": "官岭民居分两批集中建造：2009 年一批，2020 至 2021 年另一批。"
+                        }
+                    },
+                    "村落发展、文旅与产业": {
+                        description: "包括古村落保护、古树、文旅项目、特色产业等发展方向。",
+                        details: "完整保护阶梯式连片夯土古民居、陈氏宗祠、四座庙宇。遵循'修旧如故'原则。",
+                        children: {
+                            "古村落保护": "完整保护阶梯式连片夯土古民居、宗祠、庙宇、古粮仓、千年古道。遵循'修旧如故'原则。",
+                            "古树": "村口有百年柳杉、红豆杉、香榧等古树群（松阳五大古树群之一）。",
+                            "文旅项目": "写生摄影基地、民宿与线路、文化 IP 与研学。",
+                            "特色产业": "传统农林、茶叶、集体经济、未来规划。",
+                            "村史民俗整理": "官岭相关故事由民间艺人邱少敏于 2015 年据世代口述整理成文。"
+                        }
+                    }
+                }
+            },
+            "竹囮村": {
+                description: "位于松阳县新兴镇，因四面遍布毛竹山得名。下辖岗头自然村为国家级传统古村落。",
+                subNodes: {
+                    "村落概况与历史传说": {
+                        description: "竹囮村的地理位置、人口规模、郑氏祠堂的特殊地位及郑淑英爱情传说。",
+                        details: "竹囮村因四面遍布毛竹山得名。郑氏祠堂为松阳县唯一供奉女性祖先的祠堂。郑淑英为明太祖朱元璋四世孙媳妇。",
+                        children: {
+                            "地理位置与建制": "位于松阳县新兴镇，下辖岗头自然村为国家级传统古村落。2024 年与上方官岭村完成合并。",
+                            "人口规模": "全村约 370 余人。",
+                            "郑氏祠堂的特殊地位": "郑氏祠堂为松阳县唯一供奉女性祖先的祠堂，所奉郑淑英为明太祖朱元璋四世孙媳妇。",
+                            "郑淑英爱情传说": "明太祖四世孙沈庄王朱幼?狩猎途经竹囮遇村姑郑淑英，二人一见倾心，后结为夫妻。",
+                            "定陶王令谕": "嘉庆年间定陶王令谕明确指示立祠堂奉祀母太妃神像，宗谱记载祠堂在光绪年间大加整修。"
+                        }
+                    },
+                    "郑氏祠堂建筑": {
+                        description: "始建于清嘉庆年间，距今约两百余年，由定陶王与舅舅郑清等人共同修筑。",
+                        details: "位于村口，与先锋庙（佛）、宝云堂（道）并列，形成松阳独有的祖先—佛—道并排布局。",
+                        children: {
+                            "始建年代": "始建于清嘉庆年间，距今约两百余年。为沈庄王与郑淑英之子定陶王朱诠鑨与舅舅郑清等人共同修筑。",
+                            "建筑特征": "位于村口，与先锋庙（佛）、宝云堂（道）并列。祠堂无封闭院墙，仅设两米开外照壁挡风水外流。",
+                            "内部陈设": "内壁龛彩绘为身穿龙头服饰的郑淑英女性画像，两侧侍女举障扇、执如意。",
+                            "族谱": "原有一本老族谱记载嘉庆年间郑淑英娘娘故事，每隔数代集中编修一次。",
+                            "修缮与维护": "2024 年修缮一次，由外迁郑氏族人集资完成。每年 12 月请戏班在祠堂搭台唱戏三天。"
+                        }
+                    },
+                    "庙宇信仰体系": {
+                        description: "包括先锋庙（主庙）和宝云堂（道教宫观）。",
+                        details: "先锋庙主祀平水大王，配祀李先锋、李大夫两兄弟。宝云堂与郑氏祠堂、先锋庙并列于村口。",
+                        children: {
+                            "先锋庙（主庙）": "主祀神明为平水大王，主要掌管风雨。配祀李先锋、李大夫两兄弟。",
+                            "宝云堂": "道教宫观，与郑氏祠堂、先锋庙并列于村口，构成佛、道、祖先并排的独特布局。"
+                        }
+                    },
+                    "先锋庙会（县级非遗民俗）": {
+                        description: "每年农历三月十五举办，为主神平水大王诞辰祝寿，是竹囮村一年最盛大的集体活动。",
+                        details: "参与人数约 370 余人，2023年达600余人。包括迎神祭祖、舞龙灯、唱戏、做乌饭等活动。",
+                        children: {
+                            "日期与缘起": "每年农历三月十五，为主神平水大王诞辰祝寿，祈求全年风调雨顺、五谷丰登。",
+                            "参与规模": "全村约 370 余人，2023 年参与人数达 600 余人（含外迁返乡者及各地摄影爱好者）。",
+                            "活动场所": "郑氏祠堂、先锋庙、宝云堂、村后山龙脉山岗。",
+                            "完整活动流程": {
+                                description: "以迎神祭祖为核心，依次展开舞龙灯、唱戏、做乌饭等环节。",
+                                details: "完整庙会流程由迎神祭祖起始，随后进行舞龙灯、唱戏和做乌饭，形成一整套集体庆典仪式。",
+                                children: {
+                                    "迎神祭祖": "村民身着红、黄、绿传统服饰，锣鼓、旌旗开路，抬神像轿子列队；从祠堂出发沿山道登上后山龙脉山岗，集体焚香祭拜，鞭炮鼓乐齐鸣；祭拜后换另一条山道绕村返程，全程全村参与，大量在外村民专程返乡。",
+                                    "舞龙灯": "村内会使用十一节龙灯（龙头龙尾 + 九节龙身，红布连接），并穿着具有本地特色的舞龙服饰沿着与迎神队伍一致的路线巡游，巡游途中持续燃放鞭炮，热闹非凡",
+                                    "唱戏": "村里每年12月举办三日敬老还愿戏、中间过道搭木板即成戏台、同时放置座椅、恭请先锋庙佛像观戏，用以年末酬神还年初所愿。剧目含本土非遗松阳高腔与外聘戏班出演的婺剧，二者唱腔各异。",
+                                    "做乌饭": "村民取南烛叶入锅煮烂滤取乌色汁液，以该汁液浸泡糯米着色，随后将浸好的糯米入笼蒸熟，最后搭配瘦肉、豌豆等辅料入锅翻炒，即成清香适口的乌饭。"
+                                }
+                            },
+                            "庙会组织与经费": "资金来自村民自筹、外迁族人及周边祈福民众捐赠。收支明细张贴庙内并同步微信群公开。"
+                        }
+                    },
+                    "其他民俗活动与日常信仰": {
+                        description: "包括除夕与元宵祭拜、平日许愿等日常信仰活动。",
+                        details: "除夕、元宵节均有祭拜仪式。平日常有周边村民前来许愿，尤其是家中学子备考时。",
+                        children: {
+                            "除夕与元宵祭拜": "除夕、元宵节均有祭拜仪式。正月十六村民携带供品集中摆祭，祭祀结束后族人集体聚餐。",
+                            "平日许愿": "平日常有周边村民前来许愿，邻村曾有身体不适者来庙中暂住调养。"
+                        }
+                    },
+                    "竹资源与手工竹编": {
+                        description: "毛竹为本地核心山林资源，包括簸箕编织技艺等传统手工。",
+                        details: "竹囮村因四面遍布毛竹山得名。簸箕编织约半小时完成一件，匠人常年制作。",
+                        children: {
+                            "毛竹资源": "竹囮村因四面遍布毛竹山得名，毛竹为本地核心山林资源。",
+                            "簸箕编织技艺": "约半小时完成一件；采伐、劈分、削刮、编织成型等步骤。匠人每日可编 4 件，现价约 30 元/套。",
+                            "夯土民居现状": "本地已不再新建夯土房屋，仅古村落修缮传统老宅时仍用竹编工具。"
+                        }
+                    },
+                    "村落文旅与媒体传播": {
+                        description: "包括文旅价值、文化礼堂、传承意义等。",
+                        details: "每年庙会吸引各地摄影爱好者、游客前来采风。文化礼堂被中新网报道为浙江乡村文化典型案例。",
+                        children: {
+                            "文旅价值": "每年庙会吸引各地摄影爱好者、游客前来采风，带动古村落旅游。竹林成片、古树参天、溪水潺潺。",
+                            "文化礼堂": "庙会以村级文化礼堂为组织阵地，成为乡村精神文化活动标杆。",
+                            "传承意义": "先锋庙会是竹囮村一年最盛大集体活动，维系宗族乡情、传承山区乡土信仰。"
+                        }
+                    },
+                    "后山古墓": {
+                        description: "后山上有一座古墓，根据古墓所用石料及制作精细程度推断墓主地位显赫。",
+                        details: "墓前山岗即为村民所说的'龙脉'。是否属于郑娘娘之墓已无从考证。",
+                        children: {}
+                    }
+                }
+            }
+        };
+
+        // 构建图表数据
+        const nodesData = [];
+        const linksData = [];
+        let nodeId = 0;
+        const nodeMap = {};
+
+        // 添加一级节点
+        Object.keys(knowledgeData).forEach((village, idx) => {
+            const id = nodeId++;
+            nodeMap[village] = id;
+            nodesData.push({
+                id: id,
+                name: village,
+                level: 1,
+                symbolSize: 80,
+                itemStyle: { color: '#667eea' },
+                data: knowledgeData[village]
+            });
+        });
+
+        // 添加二级节点
+        Object.keys(knowledgeData).forEach(village => {
+            const villageId = nodeMap[village];
+            Object.keys(knowledgeData[village].subNodes).forEach(subNode => {
+                const key = `${village}-${subNode}`;
+                const id = nodeId++;
+                nodeMap[key] = id;
+                nodesData.push({
+                    id: id,
+                    name: subNode,
+                    level: 2,
+                    symbolSize: 50,
+                    itemStyle: { color: '#764ba2' },
+                    data: knowledgeData[village].subNodes[subNode]
+                });
+                linksData.push({ source: villageId, target: id });
+            });
+        });
+
+        // 添加三级节点
+        Object.keys(knowledgeData).forEach(village => {
+            Object.keys(knowledgeData[village].subNodes).forEach(subNode => {
+                const key = `${village}-${subNode}`;
+                const parentId = nodeMap[key];
+                const children = knowledgeData[village].subNodes[subNode].children;
+                Object.keys(children).forEach(child => {
+                    const childValue = children[child];
+                    const childKey = `${key}-${child}`;
+                    const childId = nodeId++;
+                    nodeMap[childKey] = childId;
+
+                    if (childValue && typeof childValue === 'object' && !Array.isArray(childValue)) {
+                        nodesData.push({
+                            id: childId,
+                            name: child,
+                            level: 3,
+                            symbolSize: 35,
+                            itemStyle: { color: '#f97316' },
+                            data: {
+                                description: childValue.description || '',
+                                details: childValue.details || '',
+                                children: childValue.children || {}
+                            }
+                        });
+                        linksData.push({ source: parentId, target: childId });
+
+                        Object.keys(childValue.children || {}).forEach(grandChild => {
+                            const grandChildId = nodeId++;
+                            const grandChildKey = `${childKey}-${grandChild}`;
+                            nodeMap[grandChildKey] = grandChildId;
+                            nodesData.push({
+                                id: grandChildId,
+                                name: grandChild,
+                                level: 4,
+                                symbolSize: 28,
+                                itemStyle: { color: '#0ea5e9' },
+                                data: { description: childValue.children[grandChild] }
+                            });
+                            linksData.push({ source: childId, target: grandChildId });
+                        });
+                    } else {
+                        nodesData.push({
+                            id: childId,
+                            name: child,
+                            level: 3,
+                            symbolSize: 35,
+                            itemStyle: { color: '#f97316' },
+                            data: { description: childValue }
+                        });
+                        linksData.push({ source: parentId, target: childId });
+                    }
+                });
+            });
+        });
+
+        // 初始化图表
+        const chart = echarts.init(document.getElementById('chart'));
+        const option = {
+            title: {
+                text: '官岭村与竹囮村知识图谱',
+                left: 'center',
+                top: 20,
+                textStyle: { color: '#333', fontSize: 18, fontWeight: 'bold' }
+            },
+            tooltip: {
+                trigger: 'item',
+                formatter: function(params) {
+                    if (params.data) {
+                        return params.data.name;
+                    }
+                    return params.name;
+                }
+            },
+            series: [{
+                type: 'graph',
+                layout: 'force',
+                force: {
+                    repulsion: 100,
+                    gravity: 0.02,
+                    edgeLength: 150,
+                    layoutAnimation: true
+                },
+                data: nodesData,
+                links: linksData,
+                roam: true,
+                label: {
+                    show: true,
+                    formatter: function(params) {
+                        if (params.data.level === 1) {
+                            return params.data.name;
+                        }
+                        return params.data.name;
+                    },
+                    fontSize: 11,
+                    fontWeight: 'bold'
+                },
+                lineStyle: {
+                    color: '#ccc',
+                    width: 1,
+                    opacity: 0.6
+                },
+                itemStyle: {
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                    shadowBlur: 10,
+                    shadowColor: 'rgba(0,0,0,0.2)'
+                },
+                emphasis: {
+                    label: { show: true, fontSize: 12 },
+                    itemStyle: {
+                        borderWidth: 3,
+                        shadowBlur: 15
+                    }
+                }
+            }]
+        };
+
+        chart.setOption(option);
+
+        // 处理节点点击事件
+        chart.on('click', function(params) {
+            if (params.data) {
+                const node = params.data;
+                displayInfo(node);
+            }
+        });
+
+        function displayInfo(node) {
+            const infoPanel = document.getElementById('info-panel');
+            let html = '';
+
+            if (node.level === 1) {
+                // 一级节点
+                html = `
+                    <div class="card">
+                        <div class="card-title">📍 ${node.name}</div>
+                        <div class="card-content">${node.data.description}</div>
+                        <div class="sub-nodes">
+                            <strong>📚 下属部分：</strong>
+                            ${Object.keys(node.data.subNodes).map((sub, idx) => `
+                                <div class="sub-node-item" onclick="viewSubNode('${node.name}', '${sub}', event)">${idx + 1}. ${sub}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (node.level === 2) {
+                // 二级节点
+                html = `
+                    <div class="card">
+                        <div class="card-title">📘 ${node.name}</div>
+                        <div class="card-content">${node.data.description}</div>
+                        <div class="details">
+                            <strong style="color: #667eea;">📄 详细信息：</strong>
+                            <div class="detail-text">${node.data.details}</div>
+                        </div>
+                        <div class="sub-nodes">
+                            <strong>🔍 子项目：</strong>
+                            ${Object.keys(node.data.children).map((child, idx) => `
+                                <div class="sub-node-item" onclick="viewChild('${child}', '${node.data.children[child]}', event)">${idx + 1}. ${child}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (node.level === 3) {
+                // 三级节点
+                html = `
+                    <div class="card">
+                        <div class="card-title">📄 ${node.name}</div>
+                        <div class="details">
+                            <div class="detail-text">${node.data.description || ''}</div>
+                        </div>
+                        ${node.data.children && Object.keys(node.data.children).length ? `
+                            <div class="sub-nodes">
+                                <strong>🔍 细分节点：</strong>
+                                ${Object.keys(node.data.children).map((child, idx) => `
+                                    <div class="sub-node-item" onclick="viewChild('${child}', '${node.data.children[child]}', event)">${idx + 1}. ${child}</div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else if (node.level === 4) {
+                // 四级节点
+                html = `
+                    <div class="card">
+                        <div class="card-title">🔹 ${node.name}</div>
+                        <div class="details">
+                            <div class="detail-text">${node.data.description || ''}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            infoPanel.innerHTML = html;
+        }
+
+        window.viewSubNode = function(village, subNode, event) {
+            event.stopPropagation();
+            const node = knowledgeData[village].subNodes[subNode];
+            displaySubNodeInfo(subNode, node);
+        };
+
+        window.viewChild = function(child, description, event) {
+            event.stopPropagation();
+            const infoPanel = document.getElementById('info-panel');
+            const html = `
+                <div class="card">
+                    <div class="card-title">📌 ${child}</div>
+                    <div class="details">
+                        <div class="detail-text">${description}</div>
+                    </div>
+                </div>
+            `;
+            infoPanel.innerHTML = html;
+        };
+
+        function displaySubNodeInfo(name, data) {
+            const infoPanel = document.getElementById('info-panel');
+            let html = `
+                <div class="card">
+                    <div class="card-title">📘 ${name}</div>
+                    <div class="card-content">${data.description}</div>
+                    <div class="details">
+                        <strong style="color: #667eea;">📄 详细信息：</strong>
+                        <div class="detail-text">${data.details}</div>
+                    </div>
+                    <div class="sub-nodes">
+                        <strong>🔍 子项目：</strong>
+                        ${Object.keys(data.children).map((child, idx) => `
+                            <div class="sub-node-item" onclick="viewChild('${child}', '${data.children[child]}', event)">${idx + 1}. ${child}</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            infoPanel.innerHTML = html;
+        }
+
+        // 响应式调整
+        window.addEventListener('resize', () => {
+            chart.resize();
+        });
+    </script>
+</body>
+</html>
